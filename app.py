@@ -42,10 +42,6 @@ try:
     db = client[DB_NAME]
     events_collection = db[COLLECTION_NAME]
     print("Successfully connected to MongoDB!")
-    
-    # Clear existing test data
-    events_collection.delete_many({})
-    print("Cleared existing test data!")
 except Exception as e:
     print(f"Error connecting to MongoDB: {e}")
     raise
@@ -109,6 +105,8 @@ def index():
         # Convert ObjectId to string for JSON serialization
         for event in events:
             event['_id'] = str(event['_id'])
+            # Convert action to lowercase for template
+            event['action'] = event['action'].lower() if event.get('action') else ''
             
         return render_template('index.html', events=events)
     except Exception as e:
@@ -141,7 +139,7 @@ def webhook():
         event = {
             'request_id': '',
             'author': data.get('sender', {}).get('login', ''),
-            'action': 'UNKNOWN',
+            'action': 'unknown',
             'from_branch': '',
             'to_branch': '',
             'timestamp': current_time,
@@ -151,7 +149,7 @@ def webhook():
         if event_type == 'push':
             event.update({
                 'request_id': data.get('after', ''),
-                'action': 'PUSH',
+                'action': 'push',
                 'to_branch': data.get('ref', '').replace('refs/heads/', ''),
                 'timestamp': current_time
             })
@@ -163,7 +161,7 @@ def webhook():
             if action == 'closed' and pr_data.get('merged'):
                 event.update({
                     'request_id': str(pr_data.get('id', '')),
-                    'action': 'MERGE',
+                    'action': 'merge',
                     'from_branch': pr_data.get('head', {}).get('ref', ''),
                     'to_branch': pr_data.get('base', {}).get('ref', ''),
                     'timestamp': current_time
@@ -171,14 +169,14 @@ def webhook():
             elif action in ['opened', 'reopened', 'synchronize']:
                 event.update({
                     'request_id': str(pr_data.get('id', '')),
-                    'action': 'PULL_REQUEST',
+                    'action': 'pull_request',
                     'from_branch': pr_data.get('head', {}).get('ref', ''),
                     'to_branch': pr_data.get('base', {}).get('ref', ''),
                     'timestamp': current_time
                 })
         
         # Only store valid events
-        if event['action'] != 'UNKNOWN':
+        if event['action'] != 'unknown':
             events_collection.insert_one(event)
         
         return jsonify({'status': 'success', 'event_type': event['action']}), 200
