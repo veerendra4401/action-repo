@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Events Monitor</title>
+    <style>
+        :root {
+            --primary-color: #0366d6;
+            --secondary-color: #586069;
+            --bg-color: #f6f8fa;
+            --card-bg: #ffffff;
+            --border-color: #e1e4e8;
+            --text-color: #24292e;
+            --success-color: #28a745;
+            --warning-color: #ffd33d;
+            --danger-color: #d73a49;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .repo-links {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: var(--card-bg);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .repo-links h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        .repo-links a {
+            color: var(--primary-color);
+            text-decoration: none;
+            display: block;
+            margin: 10px 0;
+        }
+
+        .repo-links a:hover {
+            text-decoration: underline;
+        }
+
+        .event-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .event-type {
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .event-type.push { background-color: #e6ffed; color: var(--success-color); }
+        .event-type.pull_request { background-color: #fff5b1; color: var(--warning-color); }
+        .event-type.merge { background-color: #ffeef0; color: var(--danger-color); }
+
+        .timestamp {
+            color: var(--secondary-color);
+            font-size: 0.9em;
+        }
+
+        .author {
+            color: var(--secondary-color);
+            margin-bottom: 8px;
+        }
+
+        .branch-info {
+            background-color: var(--bg-color);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.9em;
+        }
+
+        .repository-link {
+            margin-top: 8px;
+        }
+
+        .repository-link a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+
+        .repository-link a:hover {
+            text-decoration: underline;
+        }
+
+        .error-message {
+            background-color: #ffeef0;
+            color: var(--danger-color);
+            padding: 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            border: 1px solid #f97583;
+        }
+
+        .no-events {
+            text-align: center;
+            padding: 40px;
+            background-color: var(--card-bg);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            color: var(--secondary-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>GitHub Events Monitor</h1>
+        </div>
+
+        <div class="repo-links">
+            <h3>Repository Links</h3>
+            <a href="https://github.com/veerendra4401/webook.git" target="_blank">
+                📦 Action Repository (GitHub Actions)
+            </a>
+            <a href="https://github.com/veerendra4401/webhook-repo.git" target="_blank">
+                💻 Webhook Repository (Application Code)
+            </a>
+        </div>
+
+        {% if error %}
+        <div class="error-message">
+            Error: {{ error }}
+        </div>
+        {% endif %}
+
+        <div id="events-container">
+            {% if events %}
+                {% for event in events %}
+                <div class="event-card">
+                    <div class="event-header">
+                        <span class="event-type {{ event.action.lower() }}">{{ event.action }}</span>
+                        <span class="timestamp" data-timestamp="{{ event.timestamp }}">{{ event.timestamp }}</span>
+                    </div>
+                    <div class="author">Author: {{ event.author }}</div>
+                    {% if event.from_branch or event.to_branch %}
+                    <div class="branch-info">
+                        {% if event.from_branch %}
+                        From: {{ event.from_branch }}<br>
+                        {% endif %}
+                        {% if event.to_branch %}
+                        To: {{ event.to_branch }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if event.repository %}
+                    <div class="repository-link">
+                        <a href="https://github.com/{{ event.repository }}" target="_blank">
+                            View in GitHub: {{ event.repository }}
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="no-events">
+                    No events yet. Create a pull request or push some changes!
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function formatDate(isoString) {
+            if (!isoString) return '';
+            
+            try {
+                const date = new Date(isoString);
+                
+                // Check if date is valid
+                if (isNaN(date.getTime())) return isoString;
+                
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMins / 60);
+                
+                // If less than 1 hour ago, show minutes
+                if (diffHours < 1) {
+                    if (diffMins < 1) return 'just now';
+                    return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+                }
+                
+                // If less than 24 hours ago, show hours
+                if (diffHours < 24) {
+                    return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                }
+                
+                // Otherwise show full date and time in local timezone
+                return date.toLocaleString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZone: 'Asia/Kolkata'
+                });
+            } catch (error) {
+                console.error('Error formatting date:', error);
+                return isoString;
+            }
+        }
+
+        function updateTimestamps() {
+            const timestamps = document.querySelectorAll('.timestamp');
+            timestamps.forEach(element => {
+                const timestamp = element.getAttribute('data-timestamp');
+                element.textContent = formatDate(timestamp);
+            });
+        }
+
+        // Update timestamps immediately and then every minute
+        updateTimestamps();
+        setInterval(updateTimestamps, 60000);
+
+        // Refresh the page every 30 seconds to get new events
+        setInterval(() => {
+            window.location.reload();
+        }, 30000);
+    </script>
+</body>
+</html>

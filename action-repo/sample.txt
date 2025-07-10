@@ -1,0 +1,8 @@
+This is a sample file to test GitHub webhook events.
+
+You can:
+1. Modify this file and push changes to test PUSH events
+2. Create a branch, modify this file, and create a PR to test PULL_REQUEST events
+3. Merge the PR to test MERGE events
+
+Feel free to modify this file for testing purposes! 
