@@ -1,71 +1,129 @@
-# GitHub Events Monitor
+# Webhook Receiver for GitHub Actions
 
-This application monitors GitHub repository events (Push, Pull Request, and Merge) using webhooks and displays them in a real-time web interface.
+This repository contains a Flask application that receives GitHub webhooks and displays repository actions in real-time.
 
 ## Features
 
-- Captures GitHub webhook events (Push, Pull Request, and Merge)
-- Stores events in MongoDB
+- Receives GitHub webhooks for:
+  - Push events
+  - Pull Request events
+  - Merge events (Brownie Points)
+- Stores action data in MongoDB
 - Real-time UI updates (15-second polling)
-- Clean and minimal event display
+- Clean and minimal design
 
-## Setup Instructions
+## Message Formats
+
+1. Push Events:
+   ```
+   "Travis" pushed to "staging" on 1st April 2021 - 9:30 PM UTC
+   ```
+
+2. Pull Request Events:
+   ```
+   "Travis" submitted a pull request from "staging" to "master" on 1st April 2021 - 9:00 AM UTC
+   ```
+
+3. Merge Events:
+   ```
+   "Travis" merged branch "dev" to "master" on 2nd April 2021 - 12:00 PM UTC
+   ```
+
+## Prerequisites
+
+- Python 3.7+
+- MongoDB
+- Git
+
+## Setup
 
 1. Clone the repository:
-```bash
-git clone <your-webhook-repo-url>
-cd webhook-repo
+   ```bash
+   git clone <your-webhook-repo-url>
+   cd webhook-repo
+   ```
+
+2. Create and activate virtual environment:
+   ```bash
+   python -m venv venv
+   # On Windows:
+   .\venv\Scripts\activate
+   # On Unix or MacOS:
+   source venv/bin/activate
+   ```
+
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Create `.env` file:
+   ```
+   MONGODB_URI=mongodb://localhost:27017/
+   FLASK_APP=app.py
+   FLASK_ENV=development
+   FLASK_DEBUG=1
+   PORT=5000
+   HOST=0.0.0.0
+   ```
+
+5. Start MongoDB:
+   - Make sure MongoDB is running on your system
+   - Default connection: mongodb://localhost:27017/
+
+6. Run the application:
+   ```bash
+   python app.py
+   ```
+
+## MongoDB Schema
+
+```json
+{
+    "request_id": "string (commit hash or PR ID)",
+    "author": "string (GitHub username)",
+    "action": "string (PUSH/PULL_REQUEST/MERGE)",
+    "timestamp": "string (ISO format UTC)",
+    "from_branch": "string (source branch, null for push)",
+    "to_branch": "string (target branch)",
+    "formatted_message": "string (formatted display message)"
+}
 ```
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+## API Endpoints
 
-3. Set up MongoDB:
-- Install MongoDB if not already installed
-- Create a `.env` file with your MongoDB connection string:
-```
-MONGO_URI=mongodb://localhost:27017/
-```
+- `GET /` - Web UI
+- `POST /webhook` - GitHub webhook endpoint
+- `GET /actions` - Get latest actions (JSON)
 
-4. Run the application:
-```bash
-python app.py
-```
+## Testing
 
-5. Configure GitHub Webhook:
-- Go to your action-repo settings
-- Navigate to Webhooks
-- Add webhook:
-  - Payload URL: `http://your-domain:5000/webhook`
-  - Content type: `application/json`
-  - Select events: `Pushes`, `Pull requests`
-  - Enable SSL verification if using HTTPS
+1. Start the server
+2. Configure webhook in action-repo:
+   - Go to action-repo Settings > Webhooks
+   - Add webhook:
+     - Payload URL: `http://your-domain:5000/webhook`
+     - Content Type: `application/json`
+     - Events: Push and Pull requests
 
-## Usage
+## Development
 
-1. The application will run on `http://localhost:5000`
-2. The UI automatically updates every 15 seconds
-3. Events are displayed in chronological order with the following format:
-   - Push: "{author} pushed to {to_branch} on {timestamp}"
-   - Pull Request: "{author} submitted a pull request from {from_branch} to {to_branch} on {timestamp}"
-   - Merge: "{author} merged branch {from_branch} to {to_branch} on {timestamp}"
-
-## Project Structure
-
+The application is structured as follows:
 ```
 webhook-repo/
-├── app.py              # Flask application
+├── app.py              # Main Flask application
 ├── requirements.txt    # Python dependencies
-├── templates/         
-│   └── index.html     # Frontend UI template
-└── .env               # Environment variables
+├── .env               # Environment variables
+├── .gitignore         # Git ignore rules
+├── README.md          # This file
+└── templates/         # HTML templates
+    └── index.html     # Main UI template
 ```
 
-## Notes
+## Production Deployment
 
-- Make sure your webhook endpoint is publicly accessible
-- The application uses UTC timestamps
-- Events are stored in MongoDB for persistence
-- The UI displays the 10 most recent events 
+For production:
+1. Use a production-grade WSGI server (e.g., Gunicorn)
+2. Set up proper MongoDB authentication
+3. Use HTTPS for webhook endpoint
+4. Set `FLASK_ENV=production` and `FLASK_DEBUG=0` 

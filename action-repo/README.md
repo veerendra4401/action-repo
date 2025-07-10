@@ -1,50 +1,51 @@
-# Action Repository
+# Github Action Repository
 
-This is a test repository configured to send webhook events to our webhook receiver application. It's used to demonstrate GitHub webhook functionality for:
+This repository is configured to send webhook events to our webhook receiver for the following Github actions:
 - Push events
 - Pull Request events
 - Merge events
 
-## Purpose
+## Webhook Configuration
 
-This repository is configured to send webhook events to our webhook receiver application. When any of the following actions occur in this repository:
-- Pushing code
-- Creating pull requests
-- Merging branches
-
-A webhook notification will be sent to our webhook receiver, which will then:
-1. Process the event
-2. Store it in MongoDB
-3. Display it in the UI
+1. Go to repository Settings > Webhooks
+2. Add webhook:
+   - Payload URL: `http://your-domain:5000/webhook`
+   - Content Type: `application/json`
+   - Events to trigger webhook:
+     - Push events
+     - Pull requests
+     - Active: ✓
 
 ## Testing Webhook Events
 
-To test different events:
-
-1. Push Event:
+### Push Event
 ```bash
-# Make some changes
-git add .
-git commit -m "test: trigger push event"
-git push origin main
-```
-
-2. Pull Request Event:
-```bash
-# Create a new branch
+# Create and push changes
 git checkout -b feature/test
-# Make changes
-git add .
-git commit -m "feat: test pull request"
+echo "test" > test.txt
+git add test.txt
+git commit -m "test commit"
 git push origin feature/test
-# Create PR through GitHub interface
 ```
 
-3. Merge Event:
-```bash
-# Through GitHub interface, merge the PR
-# Or locally:
-git checkout main
-git merge feature/test
-git push origin main
-``` 
+Expected format: "{author} pushed to {to_branch} on {timestamp}"
+
+### Pull Request Event
+1. Create a new branch
+2. Make changes and push
+3. Create Pull Request via Github UI
+
+Expected format: "{author} submitted a pull request from {from_branch} to {to_branch} on {timestamp}"
+
+### Merge Event
+1. Review and approve PR
+2. Merge PR via Github UI
+
+Expected format: "{author} merged branch {from_branch} to {to_branch} on {timestamp}"
+
+## Sample Files
+
+This repository contains sample files to test webhook events:
+- `test.txt` - Use for push events
+- `feature.txt` - Use for pull request testing
+- `README.md` - Documentation updates 

@@ -3,550 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub Events Monitor</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Github Actions Monitor</title>
     <style>
-        :root {
-            --primary-color: #0366d6;
-            --primary-hover: #035fc7;
-            --secondary-color: #586069;
-            --bg-color: #f6f8fa;
-            --card-bg: #ffffff;
-            --border-color: #e1e4e8;
-            --text-color: #24292e;
-            --success-color: #28a745;
-            --success-bg: #e6ffed;
-            --warning-color: #ffd33d;
-            --warning-bg: #fff5b1;
-            --danger-color: #d73a49;
-            --danger-bg: #ffeef0;
-            --shadow-color: rgba(0, 0, 0, 0.1);
-        }
-
-        [data-theme="dark"] {
-            --primary-color: #58a6ff;
-            --primary-hover: #79b8ff;
-            --secondary-color: #8b949e;
-            --bg-color: #0d1117;
-            --card-bg: #161b22;
-            --border-color: #30363d;
-            --text-color: #c9d1d9;
-            --success-bg: rgba(46, 160, 67, 0.1);
-            --warning-bg: rgba(255, 211, 61, 0.1);
-            --danger-bg: rgba(248, 81, 73, 0.1);
-            --shadow-color: rgba(0, 0, 0, 0.3);
-        }
-
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-
-        .container {
+            font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
         }
-
-        .header {
-            margin-bottom: 30px;
-            text-align: center;
-            position: relative;
-        }
-
-        .controls {
-            position: absolute;
-            right: 0;
-            top: 0;
-            display: flex;
-            gap: 10px;
-        }
-
-        button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 8px 12px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            transition: all 0.2s ease;
-            font-size: 0.9em;
-        }
-
-        button:hover {
-            background-color: var(--primary-hover);
-            transform: translateY(-1px);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        .theme-toggle {
-            background-color: var(--secondary-color);
-        }
-
-        .repo-links {
-            margin: 20px 0;
+        .action-card {
+            background: white;
             padding: 15px;
-            background-color: var(--card-bg);
-            border-radius: 6px;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 1px 3px var(--shadow-color);
-            transition: all 0.3s ease;
-        }
-
-        .repo-links:hover {
-            box-shadow: 0 3px 6px var(--shadow-color);
-        }
-
-        .repo-links h3 {
-            margin-top: 0;
-            color: var(--primary-color);
-        }
-
-        .repo-links a {
-            color: var(--primary-color);
-            text-decoration: none;
-            display: block;
             margin: 10px 0;
-            padding: 8px;
-            border-radius: 4px;
-            transition: all 0.2s ease;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            line-height: 1.6;
         }
-
-        .repo-links a:hover {
-            text-decoration: underline;
-            background-color: rgba(3, 102, 214, 0.1);
+        .action-type {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-right: 10px;
+            vertical-align: middle;
         }
-
-        .event-card {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: 0 1px 3px var(--shadow-color);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeInUp 0.5s ease forwards;
-        }
-
-        @keyframes fadeInUp {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .event-card:hover {
-            box-shadow: 0 5px 15px var(--shadow-color);
-            transform: translateY(-2px);
-        }
-
-        .event-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 4px;
-            height: 100%;
-            background-color: var(--primary-color);
-        }
-
-        .event-card.push::before {
-            background-color: var(--success-color);
-        }
-
-        .event-card.pull_request::before {
-            background-color: var(--warning-color);
-        }
-
-        .event-card.merge::before {
-            background-color: var(--danger-color);
-        }
-
-        /* Event card variations based on type */
-        .event-card[data-event-type="push"] {
-            border-left: 4px solid #28a745;
-            background: linear-gradient(to right, rgba(40, 167, 69, 0.1), transparent);
-        }
-        
-        .event-card[data-event-type="pull_request"] {
-            border-left: 4px solid #0366d6;
-            background: linear-gradient(to right, rgba(3, 102, 214, 0.1), transparent);
-        }
-
-        .event-header {
+        .push { background: #e1f5fe; color: #0277bd; }
+        .pull_request { background: #f3e5f5; color: #7b1fa2; }
+        .merge { background: #e8f5e9; color: #2e7d32; }
+        .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 20px;
         }
-
-        .event-type {
-            font-weight: 600;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.9em;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .event-type.push {
-            background-color: var(--success-bg);
-            color: var(--success-color);
-        }
-
-        .event-type.pull_request {
-            background-color: var(--warning-bg);
-            color: var(--warning-color);
-        }
-
-        .event-type.merge {
-            background-color: var(--danger-bg);
-            color: var(--danger-color);
-        }
-
-        .timestamp {
-            color: var(--secondary-color);
+        .last-update {
+            color: #666;
             font-size: 0.9em;
         }
-
-        .author {
-            color: var(--secondary-color);
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .branch-info {
-            background-color: var(--bg-color);
-            padding: 8px 12px;
-            border-radius: 4px;
-            font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-            font-size: 0.9em;
-            margin: 8px 0;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .branch-info span {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .repository-link {
-            margin-top: 8px;
-        }
-
-        .repository-link a {
-            color: var(--primary-color);
-            text-decoration: none;
-            font-size: 0.9em;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .repository-link a:hover {
-            text-decoration: underline;
-        }
-
-        .error-message {
-            background-color: var(--danger-bg);
-            color: var(--danger-color);
-            padding: 16px;
-            border-radius: 6px;
-            margin-bottom: 16px;
-            border: 1px solid rgba(215, 58, 73, 0.5);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            animation: shake 0.5s ease;
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            20%, 60% { transform: translateX(-5px); }
-            40%, 80% { transform: translateX(5px); }
-        }
-
-        .no-events {
+        .no-actions {
             text-align: center;
             padding: 40px;
-            background-color: var(--card-bg);
-            border-radius: 6px;
-            border: 1px solid var(--border-color);
-            color: var(--secondary-color);
-            box-shadow: 0 1px 3px var(--shadow-color);
-        }
-
-        /* Improved loading animation */
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 20px;
-            color: var(--text-color);
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 0.6; }
-            50% { opacity: 1; }
-            100% { opacity: 0.6; }
-        }
-
-        .loading i {
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .refresh-btn {
-            background-color: var(--secondary-color);
-        }
-
-        @media (max-width: 768px) {
-            .header {
-                text-align: left;
-                padding-top: 40px;
-            }
-            
-            .controls {
-                top: 10px;
-                right: 10px;
-            }
-            
-            .repo-links a {
-                padding: 8px 0;
-            }
+            color: #666;
+            font-style: italic;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>GitHub Events Monitor</h1>
-            <div class="controls">
-                <button class="refresh-btn" id="refreshBtn">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
-                <button class="theme-toggle" id="themeToggle">
-                    <i class="fas fa-moon"></i> Theme
-                </button>
-            </div>
-        </div>
-
-        <div class="repo-links">
-            <h3><i class="fas fa-link"></i> Repository Links</h3>
-            <a href="https://github.com/veerendra4401/webook.git" target="_blank">
-                <i class="fas fa-cogs"></i> Action Repository (GitHub Actions)
-            </a>
-            <a href="https://github.com/veerendra4401/webhook-repo.git" target="_blank">
-                <i class="fas fa-code"></i> Webhook Repository (Application Code)
-            </a>
-        </div>
-
-        {% if error %}
-        <div class="error-message">
-            <i class="fas fa-exclamation-triangle"></i>
-            <div>Error: {{ error }}</div>
-        </div>
-        {% endif %}
-
-        <div class="loading" id="loadingIndicator">
-            <i class="fas fa-spinner"></i> Loading events...
-        </div>
-
-        <div id="events-container">
-            {% if events %}
-                {% for event in events %}
-                {% set animation_delay = loop.index * 0.1 %}
-                {% set event_type = event.action.lower() %}
-                <div class="event-card"
-                     data-event-type="{{ event_type }}"
-                     data-animation-delay="{{ animation_delay }}"
-                     style="animation-delay: {{ animation_delay }}s">
-                    <div class="event-header">
-                        <span class="event-type {{ event_type }}">
-                            <i class="fas fa-{% if event.action == 'push' %}code-branch{% elif event.action == 'pull_request' %}code-merge{% else %}code{% endif %}"></i>
-                            {{ event.action }}
-                        </span>
-                        <span class="timestamp" data-timestamp="{{ event.timestamp }}">{{ event.timestamp }}</span>
-                    </div>
-                    <div class="author">
-                        <i class="fas fa-user"></i> {{ event.author }}
-                    </div>
-                    {% if event.from_branch or event.to_branch %}
-                    <div class="branch-info">
-                        {% if event.from_branch %}
-                        <span><i class="fas fa-arrow-right"></i> From: {{ event.from_branch }}</span>
-                        {% endif %}
-                        {% if event.to_branch %}
-                        <span><i class="fas fa-arrow-right"></i> To: {{ event.to_branch }}</span>
-                        {% endif %}
-                    </div>
-                    {% endif %}
-                    {% if event.repository %}
-                    <div class="repository-link">
-                        <a href="https://github.com/{{ event.repository }}" target="_blank">
-                            <i class="fas fa-external-link-alt"></i> View in GitHub: {{ event.repository }}
-                        </a>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            {% else %}
-                <div class="no-events">
-                    <i class="fas fa-inbox fa-2x" style="margin-bottom: 15px;"></i>
-                    <h3>No events yet</h3>
-                    <p>Create a pull request or push some changes!</p>
-                </div>
-            {% endif %}
-        </div>
+    <div class="header">
+        <h1>Github Actions Monitor</h1>
+        <span class="last-update" id="last-update"></span>
     </div>
+    <div id="actions-container"></div>
 
     <script>
-        // DOM Elements
-        const themeToggle = document.getElementById('themeToggle');
-        const refreshBtn = document.getElementById('refreshBtn');
-        const eventsContainer = document.getElementById('events-container');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-
-        // Theme Management
-        function setTheme(theme) {
-            document.documentElement.setAttribute('data-theme', theme);
-            localStorage.setItem('theme', theme);
-            
-            // Update button icon and text
-            const icon = themeToggle.querySelector('i');
-            const isDark = theme === 'dark';
-            icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
-            themeToggle.innerHTML = `<i class="${icon.className}"></i> ${isDark ? 'Light' : 'Dark'}`;
+        function updateLastUpdateTime() {
+            const now = new Date();
+            document.getElementById('last-update').textContent = 
+                `Last updated: ${now.toLocaleTimeString()}`;
         }
 
-        function toggleTheme() {
-            const currentTheme = document.documentElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            setTheme(newTheme);
+        function formatAction(action) {
+            return `
+                <div class="action-card">
+                    <span class="action-type ${action.action.toLowerCase()}">${action.action}</span>
+                    ${action.formatted_message}
+                </div>
+            `;
         }
 
-        // Initialize theme
-        const savedTheme = localStorage.getItem('theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
-        setTheme(initialTheme);
-
-        // Event Listeners
-        themeToggle.addEventListener('click', toggleTheme);
-        refreshBtn.addEventListener('click', refreshEvents);
-
-        // Timestamp formatting
-        function formatDate(isoString) {
-            if (!isoString) return '';
-            
-            try {
-                const date = new Date(isoString);
-                
-                if (isNaN(date.getTime())) return isoString;
-                
-                const now = new Date();
-                const diffMs = now - date;
-                const diffMins = Math.floor(diffMs / 60000);
-                const diffHours = Math.floor(diffMins / 60);
-                const diffDays = Math.floor(diffHours / 24);
-                
-                if (diffMins < 1) return 'just now';
-                if (diffHours < 1) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-                if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-                if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-                
-                return date.toLocaleString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: numericIfNotCurrentYear(date),
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true,
-                    timeZone: 'Asia/Kolkata'
+        function fetchActions() {
+            fetch('/actions')
+                .then(response => response.json())
+                .then(actions => {
+                    const container = document.getElementById('actions-container');
+                    if (actions.length === 0) {
+                        container.innerHTML = '<div class="no-actions">No actions recorded yet</div>';
+                    } else {
+                        container.innerHTML = actions.map(formatAction).join('');
+                    }
+                    updateLastUpdateTime();
+                })
+                .catch(error => {
+                    console.error('Error fetching actions:', error);
+                    const container = document.getElementById('actions-container');
+                    container.innerHTML = '<div class="no-actions">Error loading actions. Please try again later.</div>';
                 });
-                
-                function numericIfNotCurrentYear(date) {
-                    return date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric';
-                }
-            } catch (error) {
-                console.error('Error formatting date:', error);
-                return isoString;
-            }
         }
 
-        function updateTimestamps() {
-            const timestamps = document.querySelectorAll('.timestamp');
-            timestamps.forEach(element => {
-                const timestamp = element.getAttribute('data-timestamp');
-                element.textContent = formatDate(timestamp);
-            });
-        }
+        // Initial fetch
+        fetchActions();
 
-        // Refresh functionality
-        async function refreshEvents() {
-            try {
-                // Show loading state
-                loadingIndicator.style.display = 'block';
-                refreshBtn.disabled = true;
-                refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing';
-                
-                // Remove any existing error message
-                const errorMessage = document.querySelector('.error-message');
-                if (errorMessage) errorMessage.remove();
-                
-                // Reload the page
-                window.location.reload();
-            } catch (error) {
-                console.error('Error refreshing:', error);
-            } finally {
-                loadingIndicator.style.display = 'none';
-                refreshBtn.disabled = false;
-                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
-            }
-        }
-
-        // Auto-refresh (every 30 seconds)
-        let refreshInterval = setInterval(() => {
-            refreshEvents();
-        }, 30000);
-
-        // Pause auto-refresh when window is not visible
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                clearInterval(refreshInterval);
-            } else {
-                refreshInterval = setInterval(() => {
-                    refreshEvents();
-                }, 30000);
-            }
-        });
-
-        // Initialize timestamps
-        updateTimestamps();
-        setInterval(updateTimestamps, 60000);
+        // Poll every 15 seconds
+        setInterval(fetchActions, 15000);
     </script>
 </body>
-</html>
+</html> 
