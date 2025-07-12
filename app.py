@@ -1,158 +1,217 @@
-from flask import Flask, request, jsonify, render_template
-from flask_cors import CORS
-from pymongo import MongoClient
-from datetime import datetime
-import os
-from dotenv import load_dotenv
-from typing import Optional, Dict, Any
-import logging
+"""
+GitHub Events Monitor
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+This Flask application monitors GitHub webhook events and displays them in real-time.
+It supports monitoring of push events, pull requests, and merge events.
+
+Environment Variables:
+    MONGODB_URI: MongoDB connection string (default: mongodb://localhost:27017/)
+    GITHUB_SECRET: GitHub webhook secret for payload verification
+"""
+
+import os
+from datetime import datetime, timedelta
+from flask import Flask, request, jsonify, render_template
+from pymongo import MongoClient
+import pytz
+import hmac
+import hashlib
+from dotenv import load_dotenv
+from dateutil import parser
 
 # Load environment variables
 load_dotenv()
 
+# Initialize Flask application
 app = Flask(__name__)
-CORS(app)
 
-# MongoDB connection with error handling
-try:
-    client = MongoClient(os.getenv('MONGODB_URI', 'mongodb://localhost:27017/'))
-    # Test the connection
-    client.server_info()
-    db = client['github_webhook_db']
-    actions_collection = db['actions']
-    logger.info("Successfully connected to MongoDB")
-except Exception as e:
-    logger.error(f"Failed to connect to MongoDB: {str(e)}")
-    raise
+# MongoDB configuration
+MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/')
+DB_NAME = 'github_events'
+COLLECTION_NAME = 'events'
 
-def format_timestamp(timestamp_str: str) -> str:
-    """Format timestamp to match requirements: '1st April 2021 - 9:30 PM UTC'"""
-    dt = datetime.fromisoformat(timestamp_str)
-    day = str(dt.day)
-    if day.endswith('1') and day != '11':
-        day += 'st'
-    elif day.endswith('2') and day != '12':
-        day += 'nd'
-    elif day.endswith('3') and day != '13':
-        day += 'rd'
-    else:
-        day += 'th'
-    return dt.strftime(f'{day} %B %Y - %I:%M %p UTC')
+# GitHub webhook secret
+GITHUB_SECRET = os.getenv('GITHUB_SECRET', '')
+
+def get_mongodb_client():
+    """Get MongoDB client with proper error handling."""
+    try:
+        client = MongoClient(MONGODB_URI)
+        # Test the connection
+        client.admin.command('ping')
+        return client
+    except Exception as e:
+        print(f"Error connecting to MongoDB: {e}")
+        return None
+
+# Initialize MongoDB connection
+client = get_mongodb_client()
+if client:
+    db = client[DB_NAME]
+    events_collection = db[COLLECTION_NAME]
+    print("Successfully connected to MongoDB!")
+else:
+    print("Failed to connect to MongoDB. Please check your connection string.")
+
+def verify_github_signature(payload_body, signature_header):
+    """
+    Verify that the webhook payload is from GitHub using the secret token.
+    """
+    if not GITHUB_SECRET or not signature_header:
+        return False
+        
+    expected_signature = 'sha1=' + hmac.new(
+        GITHUB_SECRET.encode(),
+        payload_body,
+        hashlib.sha1
+    ).hexdigest()
+    
+    return hmac.compare_digest(expected_signature, signature_header)
+
+def format_timestamp(timestamp_str):
+    """
+    Format timestamp to match requirements: '1st April 2021 - 9:30 PM UTC'
+    """
+    try:
+        dt = parser.parse(timestamp_str)
+        dt_utc = dt.astimezone(pytz.UTC)
+        
+        # Get day with suffix (1st, 2nd, 3rd, etc.)
+        day = dt_utc.day
+        if 10 <= day % 100 <= 20:
+            suffix = 'th'
+        else:
+            suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
+        
+        return dt_utc.strftime(f'%-d{suffix} %B %Y - %-I:%M %p UTC')
+    except Exception:
+        return timestamp_str
+
+def clean_old_events():
+    """Remove events older than 24 hours to maintain data freshness."""
+    if not client:
+        return
+        
+    cutoff_time = datetime.now(pytz.UTC) - timedelta(hours=24)
+    events_collection.delete_many({
+        'timestamp': {'$lt': cutoff_time.isoformat()}
+    })
 
 @app.route('/')
 def index():
+    """Render the main page with GitHub events."""
     try:
-        return render_template('index.html')
+        if not client:
+            return render_template('index.html', events=[], error="MongoDB connection not available")
+            
+        # Clean old events before displaying
+        clean_old_events()
+        
+        # Get all events sorted by timestamp in descending order
+        events = list(events_collection.find().sort('timestamp', -1))
+        
+        # Format events for display
+        for event in events:
+            event['_id'] = str(event['_id'])
+            event['formatted_message'] = format_event_message(event)
+            
+        return render_template('index.html', events=events)
     except Exception as e:
-        logger.error(f"Error rendering index.html: {str(e)}")
-        return jsonify({'error': 'Internal server error'}), 500
+        return render_template('index.html', events=[], error=str(e))
+
+def format_event_message(event):
+    """Format event message according to requirements."""
+    timestamp = format_timestamp(event['timestamp'])
+    
+    if event['action'] == 'PUSH':
+        return f'"{event["author"]}" pushed to "{event["to_branch"]}" on {timestamp}'
+    elif event['action'] == 'PULL_REQUEST':
+        return f'"{event["author"]}" submitted a pull request from "{event["from_branch"]}" to "{event["to_branch"]}" on {timestamp}'
+    elif event['action'] == 'MERGE':
+        return f'"{event["author"]}" merged branch "{event["from_branch"]}" to "{event["to_branch"]}" on {timestamp}'
+    return ''
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    try:
-        data: Dict[str, Any] = request.json if request.json else {}
+    """Handle incoming GitHub webhook events."""
+    if not client:
+        return jsonify({'error': 'MongoDB connection not available'}), 503
         
-        # Extract relevant information based on the event type
+    try:
+        # Verify GitHub signature
+        signature = request.headers.get('X-Hub-Signature')
+        if not verify_github_signature(request.get_data(), signature):
+            return jsonify({'error': 'Invalid signature'}), 401
+            
+        data = request.json or {}
         event_type = request.headers.get('X-GitHub-Event', '')
-        logger.info(f"Received webhook event: {event_type}")
+        current_time = datetime.now(pytz.UTC).isoformat()
         
-        if not event_type or event_type not in ['push', 'pull_request']:
-            return jsonify({'status': 'ignored', 'message': f'Event {event_type} not handled'}), 200
-
-        # Initialize action_data with safe defaults
-        action_data = {
+        # Extract relevant information from the webhook payload
+        event = {
             'request_id': '',
-            'author': '',
-            'timestamp': datetime.utcnow().isoformat(),
-            'action': '',
+            'author': data.get('sender', {}).get('login', ''),
+            'action': 'UNKNOWN',
+            'from_branch': '',
             'to_branch': '',
-            'from_branch': None,
-            'formatted_message': ''
+            'timestamp': current_time,
+            'repository': data.get('repository', {}).get('full_name', '')
         }
-        
-        if event_type == 'push':
-            # Handle push event
-            if not data:
-                logger.warning("Invalid push event data received")
-                return jsonify({'status': 'error', 'message': 'Invalid push event data'}), 400
-                
-            author = data.get('pusher', {}).get('name', 'Unknown')
-            to_branch = data.get('ref', '').split('/')[-1] if data.get('ref') else 'unknown'
-            
-            action_data.update({
-                'request_id': data.get('after', ''),
-                'author': author,
-                'action': 'PUSH',
-                'to_branch': to_branch,
-                'formatted_message': f'"{author}" pushed to "{to_branch}"'
-            })
-            
-        elif event_type == 'pull_request':
-            # Handle pull request event
-            pull_request = data.get('pull_request', {})
-            if not pull_request:
-                logger.warning("Invalid pull request data received")
-                return jsonify({'status': 'error', 'message': 'Invalid pull request data'}), 400
-                
-            pr_action = data.get('action', '')
-            author = pull_request.get('user', {}).get('login', 'Unknown')
-            from_branch = pull_request.get('head', {}).get('ref', 'unknown')
-            to_branch = pull_request.get('base', {}).get('ref', 'unknown')
-            
-            is_merge = pr_action == 'closed' and pull_request.get('merged', False)
-            action_type = 'MERGE' if is_merge else 'PULL_REQUEST'
-            
-            message = (
-                f'"{author}" merged branch "{from_branch}" to "{to_branch}"'
-                if is_merge else
-                f'"{author}" submitted a pull request from "{from_branch}" to "{to_branch}"'
-            )
-            
-            action_data.update({
-                'request_id': str(pull_request.get('id', '')),
-                'author': author,
-                'action': action_type,
-                'from_branch': from_branch,
-                'to_branch': to_branch,
-                'formatted_message': message
-            })
-        
-        # Add timestamp to formatted message
-        action_data['formatted_message'] += f" on {format_timestamp(action_data['timestamp'])}"
-        
-        # Store in MongoDB
-        actions_collection.insert_one(action_data)
-        logger.info(f"Successfully stored action: {action_data['action']}")
-        
-        return jsonify({'status': 'success', 'data': action_data}), 200
-        
-    except Exception as e:
-        logger.error(f"Error processing webhook: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/actions', methods=['GET'])
-def get_actions():
-    try:
-        # Get the latest actions from MongoDB
-        actions = list(actions_collection.find(
-            {},
-            {'_id': 0}  # Exclude MongoDB _id from results
-        ).sort('timestamp', -1).limit(10))  # Get latest 10 actions
+        if event_type == 'push':
+            event.update({
+                'request_id': data.get('after', ''),
+                'action': 'PUSH',
+                'to_branch': data.get('ref', '').replace('refs/heads/', ''),
+            })
+        elif event_type == 'pull_request':
+            pr_data = data.get('pull_request', {})
+            action = data.get('action', '')
+            
+            # Handle merged pull requests
+            if action == 'closed' and pr_data.get('merged'):
+                event.update({
+                    'request_id': str(pr_data.get('id', '')),
+                    'action': 'MERGE',
+                    'from_branch': pr_data.get('head', {}).get('ref', ''),
+                    'to_branch': pr_data.get('base', {}).get('ref', ''),
+                })
+            elif action in ['opened', 'reopened', 'synchronize']:
+                event.update({
+                    'request_id': str(pr_data.get('id', '')),
+                    'action': 'PULL_REQUEST',
+                    'from_branch': pr_data.get('head', {}).get('ref', ''),
+                    'to_branch': pr_data.get('base', {}).get('ref', ''),
+                })
         
-        logger.info(f"Retrieved {len(actions)} actions")
-        return jsonify(actions)
+        # Only store valid events
+        if event['action'] != 'UNKNOWN':
+            events_collection.insert_one(event)
+            event['formatted_message'] = format_event_message(event)
+        
+        return jsonify({'status': 'success', 'event': event}), 200
+        
     except Exception as e:
-        logger.error(f"Error retrieving actions: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/events', methods=['GET'])
+def get_events():
+    """API endpoint to get all events."""
+    if not client:
+        return jsonify({'error': 'MongoDB connection not available'}), 503
+        
+    try:
+        clean_old_events()
+        events = list(events_collection.find().sort('timestamp', -1))
+        
+        # Format events for display
+        for event in events:
+            event['_id'] = str(event['_id'])
+            event['formatted_message'] = format_event_message(event)
+            
+        return jsonify(events)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
-    host = os.getenv('HOST', '0.0.0.0')
-    debug = bool(int(os.getenv('FLASK_DEBUG', 1)))
-    
-    logger.info(f"Starting Flask server on {host}:{port} (debug={debug})")
-    app.run(host=host, port=port, debug=debug) 
+    app.run(debug=True)

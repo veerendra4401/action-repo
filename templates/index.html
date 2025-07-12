@@ -3,100 +3,301 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Github Actions Monitor</title>
+    <title>GitHub Events Monitor</title>
     <style>
+        :root {
+            --primary-color: #0366d6;
+            --secondary-color: #586069;
+            --bg-color: #f6f8fa;
+            --card-bg: #ffffff;
+            --border-color: #e1e4e8;
+            --text-color: #24292e;
+            --success-color: #28a745;
+            --warning-color: #ffd33d;
+            --danger-color: #d73a49;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .container {
             max-width: 800px;
             margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
         }
-        .action-card {
-            background: white;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            line-height: 1.6;
-        }
-        .action-type {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 0.8em;
-            font-weight: bold;
-            margin-right: 10px;
-            vertical-align: middle;
-        }
-        .push { background: #e1f5fe; color: #0277bd; }
-        .pull_request { background: #f3e5f5; color: #7b1fa2; }
-        .merge { background: #e8f5e9; color: #2e7d32; }
+
         .header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .repo-links {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: var(--card-bg);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .repo-links h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        .repo-links a {
+            color: var(--primary-color);
+            text-decoration: none;
+            display: block;
+            margin: 10px 0;
+        }
+
+        .repo-links a:hover {
+            text-decoration: underline;
+        }
+
+        .event-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .event-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
-        .last-update {
-            color: #666;
+
+        .event-type {
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
             font-size: 0.9em;
         }
-        .no-actions {
+
+        .event-type.push { background-color: #e6ffed; color: var(--success-color); }
+        .event-type.pull_request { background-color: #fff5b1; color: var(--warning-color); }
+        .event-type.merge { background-color: #ffeef0; color: var(--danger-color); }
+
+        .timestamp {
+            color: var(--secondary-color);
+            font-size: 0.9em;
+        }
+
+        .author {
+            color: var(--secondary-color);
+            margin-bottom: 8px;
+        }
+
+        .branch-info {
+            background-color: var(--bg-color);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.9em;
+        }
+
+        .repository-link {
+            margin-top: 8px;
+        }
+
+        .repository-link a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+
+        .repository-link a:hover {
+            text-decoration: underline;
+        }
+
+        .error-message {
+            background-color: #ffeef0;
+            color: var(--danger-color);
+            padding: 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            border: 1px solid #f97583;
+        }
+
+        .no-events {
             text-align: center;
             padding: 40px;
-            color: #666;
-            font-style: italic;
+            background-color: var(--card-bg);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            color: var(--secondary-color);
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Github Actions Monitor</h1>
-        <span class="last-update" id="last-update"></span>
+    <div class="container">
+        <div class="header">
+            <h1>GitHub Events Monitor</h1>
+        </div>
+
+        <div class="repo-links">
+            <h3>Repository Links</h3>
+            <a href="https://github.com/veerendra4401/webook.git" target="_blank">
+                📦 Action Repository (GitHub Actions)
+            </a>
+            <a href="https://github.com/veerendra4401/webhook-repo.git" target="_blank">
+                💻 Webhook Repository (Application Code)
+            </a>
+        </div>
+
+        {% if error %}
+        <div class="error-message">
+            Error: {{ error }}
+        </div>
+        {% endif %}
+
+        <div id="events-container">
+            {% if events %}
+                {% for event in events %}
+                <div class="event-card">
+                    <div class="event-header">
+                        <span class="event-type {{ event.action.lower() }}">{{ event.action }}</span>
+                        <span class="timestamp" data-timestamp="{{ event.timestamp }}">{{ event.timestamp }}</span>
+                    </div>
+                    <div class="author">Author: {{ event.author }}</div>
+                    {% if event.from_branch or event.to_branch %}
+                    <div class="branch-info">
+                        {% if event.from_branch %}
+                        From: {{ event.from_branch }}<br>
+                        {% endif %}
+                        {% if event.to_branch %}
+                        To: {{ event.to_branch }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if event.repository %}
+                    <div class="repository-link">
+                        <a href="https://github.com/{{ event.repository }}" target="_blank">
+                            View in GitHub: {{ event.repository }}
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="no-events">
+                    No events yet. Create a pull request or push some changes!
+                </div>
+            {% endif %}
+        </div>
     </div>
-    <div id="actions-container"></div>
 
     <script>
-        function updateLastUpdateTime() {
-            const now = new Date();
-            document.getElementById('last-update').textContent = 
-                `Last updated: ${now.toLocaleTimeString()}`;
-        }
-
-        function formatAction(action) {
-            return `
-                <div class="action-card">
-                    <span class="action-type ${action.action.toLowerCase()}">${action.action}</span>
-                    ${action.formatted_message}
-                </div>
-            `;
-        }
-
-        function fetchActions() {
-            fetch('/actions')
-                .then(response => response.json())
-                .then(actions => {
-                    const container = document.getElementById('actions-container');
-                    if (actions.length === 0) {
-                        container.innerHTML = '<div class="no-actions">No actions recorded yet</div>';
-                    } else {
-                        container.innerHTML = actions.map(formatAction).join('');
-                    }
-                    updateLastUpdateTime();
-                })
-                .catch(error => {
-                    console.error('Error fetching actions:', error);
-                    const container = document.getElementById('actions-container');
-                    container.innerHTML = '<div class="no-actions">Error loading actions. Please try again later.</div>';
+        function formatDate(isoString) {
+            if (!isoString) return '';
+            
+            try {
+                const date = new Date(isoString);
+                
+                // Check if date is valid
+                if (isNaN(date.getTime())) return isoString;
+                
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMins / 60);
+                
+                // If less than 1 hour ago, show minutes
+                if (diffHours < 1) {
+                    if (diffMins < 1) return 'just now';
+                    return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+                }
+                
+                // If less than 24 hours ago, show hours
+                if (diffHours < 24) {
+                    return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                }
+                
+                // Otherwise show full date and time in local timezone
+                return date.toLocaleString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZone: 'Asia/Kolkata'
                 });
+            } catch (error) {
+                console.error('Error formatting date:', error);
+                return isoString;
+            }
         }
 
-        // Initial fetch
-        fetchActions();
+        function updateTimestamps() {
+            const timestamps = document.querySelectorAll('.timestamp');
+            timestamps.forEach(element => {
+                const timestamp = element.getAttribute('data-timestamp');
+                element.textContent = formatDate(timestamp);
+            });
+        }
 
-        // Poll every 15 seconds
-        setInterval(fetchActions, 15000);
+        // Update timestamps immediately and then every minute
+        updateTimestamps();
+        setInterval(updateTimestamps, 60000);
+
+        // Function to fetch and update events
+        async function fetchEvents() {
+            try {
+                const response = await fetch('/events');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch events');
+                }
+                const events = await response.json();
+                
+                const container = document.getElementById('events-container');
+                if (events.length === 0) {
+                    container.innerHTML = `
+                        <div class="no-events">
+                            No events yet. Create a pull request or push some changes!
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = events.map(event => `
+                    <div class="event-card">
+                        <div class="event-header">
+                            <span class="event-type ${event.action.toLowerCase()}">${event.action}</span>
+                            <span class="timestamp" data-timestamp="${event.timestamp}">${formatDate(event.timestamp)}</span>
+                        </div>
+                        <div class="author">Author: ${event.author}</div>
+                        ${event.from_branch || event.to_branch ? `
+                            <div class="branch-info">
+                                ${event.from_branch ? `From: ${event.from_branch}<br>` : ''}
+                                ${event.to_branch ? `To: ${event.to_branch}` : ''}
+                            </div>
+                        ` : ''}
+                        ${event.repository ? `
+                            <div class="repository-link">
+                                <a href="https://github.com/${event.repository}" target="_blank">
+                                    View in GitHub: ${event.repository}
+                                </a>
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error fetching events:', error);
+            }
+        }
+
+        // Fetch events immediately and then every 15 seconds
+        fetchEvents();
+        setInterval(fetchEvents, 15000);
     </script>
 </body>
-</html> 
+</html>
