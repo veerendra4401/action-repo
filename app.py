@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import hmac
 import hashlib
 import json
+import pytz
 
 # Load environment variables
 load_dotenv()
@@ -22,6 +23,10 @@ collection_name = os.getenv('COLLECTION_NAME', 'events')
 client = MongoClient(mongodb_uri)
 db = client[database_name]
 collection = db[collection_name]
+
+def get_current_timestamp():
+    """Get current timestamp in ISO format with timezone"""
+    return datetime.now(pytz.UTC).isoformat()
 
 def verify_signature(payload_body, signature_header):
     """Verify that the webhook is from GitHub"""
@@ -68,7 +73,8 @@ def webhook():
     if not author:
         return 'Missing author information', 400
 
-    timestamp = datetime.utcnow().isoformat()
+    # Use the event timestamp if available, otherwise use current time
+    timestamp = payload.get('repository', {}).get('updated_at') or get_current_timestamp()
 
     # Process different event types
     if event == 'push':

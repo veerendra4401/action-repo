@@ -102,16 +102,19 @@
 
     <script>
         function formatDate(isoString) {
+            // Convert ISO string to local time and format it
             const date = new Date(isoString);
-            return date.toLocaleString('en-US', {
-                day: 'numeric',
-                month: 'long',
+            const options = {
                 year: 'numeric',
-                hour: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
                 minute: '2-digit',
+                second: '2-digit',
                 hour12: true,
-                timeZone: 'UTC'
-            }) + ' UTC';
+                timeZoneName: 'short'
+            };
+            return date.toLocaleString('en-US', options);
         }
 
         function getEventTypeClass(action) {
