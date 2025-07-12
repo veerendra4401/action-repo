@@ -10,6 +10,7 @@ This application monitors GitHub repository events using webhooks and displays t
 - Supports multiple event types with formatted display
 - Secure webhook handling with signature verification
 - Detailed event logging and monitoring
+- Automatic timestamp conversion to UTC
 
 ## Setup
 
@@ -22,6 +23,8 @@ This application monitors GitHub repository events using webhooks and displays t
    ```
    MONGODB_URI=your_mongodb_connection_string
    GITHUB_SECRET=your_webhook_secret
+   DATABASE_NAME=github_events
+   COLLECTION_NAME=events
    ```
 
 3. Configure GitHub webhook:
@@ -38,11 +41,11 @@ This application monitors GitHub repository events using webhooks and displays t
 
 ## Project Structure
 
-- `app.py` - Main Flask application
-- `templates/` - HTML templates
+- `app.py` - Main Flask application with webhook handling
+- `templates/` - HTML templates for the UI
 - `static/` - Static assets (CSS, JS)
-- `.env` - Environment variables
-- `requirements.txt` - Python dependencies
+- `.env` - Environment variables configuration
+- `requirements.txt` - Python package dependencies
 
 ## Event Formats
 
@@ -63,4 +66,11 @@ Common webhook issues:
 - Ensure the webhook URL ends with `/webhook`
 - Verify the content type is set to `application/json`
 - Check that the webhook secret matches your `.env` file
-- Monitor the application logs for detailed error messages 
+- Monitor the application logs for detailed error messages
+
+## Security Features
+
+- HMAC signature verification for webhooks
+- Environment-based configuration
+- Input validation and sanitization
+- Error handling and logging 
