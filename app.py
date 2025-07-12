@@ -12,18 +12,26 @@ Environment Variables:
 import os
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 from pymongo import MongoClient
 import pytz
 import hmac
 import hashlib
 from dotenv import load_dotenv
 from dateutil import parser
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
+logger.info("Environment variables loaded")
 
 # Initialize Flask application
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 # MongoDB configuration
 MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/')
@@ -214,4 +222,6 @@ def get_events():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Run the Flask app on all network interfaces
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
