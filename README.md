@@ -9,6 +9,7 @@ This application monitors GitHub repository events using webhooks and displays t
 - Real-time UI updates (15-second polling)
 - Supports multiple event types with formatted display
 - Secure webhook handling with signature verification
+- Detailed event logging and monitoring
 
 ## Setup
 
@@ -25,7 +26,7 @@ This application monitors GitHub repository events using webhooks and displays t
 
 3. Configure GitHub webhook:
    - Go to repository settings
-   - Add webhook with URL: `http://your-domain/webhook`
+   - Add webhook with URL: `http://your-domain/webhook` (important: include /webhook at the end)
    - Set content type to `application/json`
    - Set secret to match your `GITHUB_SECRET`
    - Select events: Push, Pull Request
@@ -54,4 +55,12 @@ This application monitors GitHub repository events using webhooks and displays t
 The webhook endpoint expects:
 - POST requests to `/webhook`
 - Valid GitHub signature in `X-Hub-Signature` header
-- JSON payload with event details 
+- JSON payload with event details
+
+## Troubleshooting
+
+Common webhook issues:
+- Ensure the webhook URL ends with `/webhook`
+- Verify the content type is set to `application/json`
+- Check that the webhook secret matches your `.env` file
+- Monitor the application logs for detailed error messages 
