@@ -8,6 +8,7 @@ This application monitors GitHub repository events using webhooks and displays t
 - Stores event data in MongoDB
 - Real-time UI updates (15-second polling)
 - Supports multiple event types with formatted display
+- Secure webhook handling with signature verification
 
 ## Setup
 
@@ -23,7 +24,7 @@ This application monitors GitHub repository events using webhooks and displays t
    ```
 
 3. Configure GitHub webhook:
-   - Go to your repository settings
+   - Go to repository settings
    - Add webhook with URL: `http://your-domain/webhook`
    - Set content type to `application/json`
    - Set secret to match your `GITHUB_SECRET`
@@ -46,4 +47,11 @@ This application monitors GitHub repository events using webhooks and displays t
 
 - Push: "{author} pushed to {to_branch} on {timestamp}"
 - Pull Request: "{author} submitted a pull request from {from_branch} to {to_branch} on {timestamp}"
-- Merge: "{author} merged branch {from_branch} to {to_branch} on {timestamp}" 
+- Merge: "{author} merged branch {from_branch} to {to_branch} on {timestamp}"
+
+## Testing Webhook
+
+The webhook endpoint expects:
+- POST requests to `/webhook`
+- Valid GitHub signature in `X-Hub-Signature` header
+- JSON payload with event details 
